@@ -2,11 +2,7 @@
 ## What is this?
 This is a [PyTorch](https://pytorch.org) implementation of various Neural Process (NPs) variants, including [Standard NPs [1]](https://arxiv.org/abs/1807.01622), [Self-attentive NPs [2]](https://arxiv.org/abs/1901.05761), and [NPs with Bayesian Aggregation [3]](https://openreview.net/forum?id=ufZN2-aehFa).
 
-![](./plots/clv.png)
-
 ![](./plots/quadratic.png)
-
-![](./plots/gps.png)
 
 Plots taken from [3].
 
