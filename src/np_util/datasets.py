@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import IterableDataset, Dataset
-from metalearning_benchmarks.benchmarks.base_benchmark import MetaLearningBenchmark
+from metalearning_benchmarks.base_benchmark import MetaLearningBenchmark
 
 
 class MetaLearningDataset(IterableDataset):

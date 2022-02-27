@@ -2,11 +2,21 @@ import os
 
 import numpy as np
 from matplotlib import pyplot as plt
-from metalearning_benchmarks.benchmarks.base_benchmark import MetaLearningBenchmark
-from metalearning_benchmarks.benchmarks.quadratic1d_benchmark import Quadratic1D
-from metalearning_benchmarks.benchmarks.affine1d_benchmark import Affine1D
+from metalearning_benchmarks.base_benchmark import MetaLearningBenchmark
+from metalearning_benchmarks import benchmark_dict as BM_DICT
 from neural_process.neural_process import NeuralProcess
 from pprint import pprint
+
+
+def collate_benchmark(benchmark: MetaLearningBenchmark):
+    # collate test data
+    x = np.zeros((benchmark.n_task, benchmark.n_datapoints_per_task, benchmark.d_x))
+    y = np.zeros((benchmark.n_task, benchmark.n_datapoints_per_task, benchmark.d_y))
+    for l, task in enumerate(benchmark):
+        x[l] = task.x
+        y[l] = task.y
+
+    return x, y
 
 
 def plot(
@@ -31,7 +41,7 @@ def plot(
     # plot predictions
     for l in range(n_task_plot):
         task = benchmark.get_task_by_index(l)
-        np_model.adapt(task=task)
+        np_model.adapt(x=task.x, y=task.y)
         ax = axes[0, l]
         ax.clear()
         ax.scatter(task.x, task.y, marker="x", s=5, color="r")
@@ -39,7 +49,7 @@ def plot(
             mu, _ = np_model.predict(x=x_plt)
             ax.plot(x_plt, mu, color="b", alpha=0.3, label="posterior")
         ax.grid()
-        ax.set_title("Predictions")
+        ax.set_title(f"Predictions (Task {l:d})")
 
     fig.tight_layout()
     plt.show(block=False)
@@ -54,28 +64,35 @@ def main():
 
     ## config
     config = dict()
-    # model
+    # model and benchmark
     config["model"] = "StandardNP"
+    config["benchmark"] = "Quadratic1D"
     # logging
     config["logpath"] = logpath
     # seed
     config["seed"] = 1234
     # meta data
-    config["data_noise_std"] = 0.5
-    config["n_task_meta"] = 16
-    config["n_datapoints_per_task_meta"] = 16
+    config["data_noise_std"] = 0.1
+    config["n_task_meta"] = 64 
+    config["n_datapoints_per_task_meta"] = 64
     config["seed_task_meta"] = 1234
     config["seed_x_meta"] = 2234
     config["seed_noise_meta"] = 3234
+    # validation data
+    config["n_task_val"] = 64 
+    config["n_datapoints_per_task_val"] = 64
+    config["seed_task_val"] = 1236
+    config["seed_x_val"] = 2236
+    config["seed_noise_val"] = 3236
     # test data
-    config["n_task_test"] = 128
-    config["n_datapoints_per_task_test"] = 2
+    config["n_task_test"] = 64 
+    config["n_datapoints_per_task_test"] = 16
     config["seed_task_test"] = 1235
     config["seed_x_test"] = 2235
     config["seed_noise_test"] = 3235
 
     # generate benchmarks
-    benchmark_meta = Affine1D(
+    benchmark_meta = BM_DICT[config["benchmark"]](
         n_task=config["n_task_meta"],
         n_datapoints_per_task=config["n_datapoints_per_task_meta"],
         output_noise=config["data_noise_std"],
@@ -83,7 +100,15 @@ def main():
         seed_x=config["seed_x_meta"],
         seed_noise=config["seed_noise_meta"],
     )
-    benchmark_test = Affine1D(
+    benchmark_val = BM_DICT[config["benchmark"]](
+        n_task=config["n_task_val"],
+        n_datapoints_per_task=config["n_datapoints_per_task_val"],
+        output_noise=config["data_noise_std"],
+        seed_task=config["seed_task_val"],
+        seed_x=config["seed_x_val"],
+        seed_noise=config["seed_noise_val"],
+    )
+    benchmark_test = BM_DICT[config["benchmark"]](
         n_task=config["n_task_test"],
         n_datapoints_per_task=config["n_datapoints_per_task_test"],
         output_noise=config["data_noise_std"],
@@ -95,20 +120,20 @@ def main():
     # architecture
     config["d_x"] = benchmark_meta.d_x
     config["d_y"] = benchmark_meta.d_y
-    config["d_z"] = 2
+    config["d_z"] = 16
     config["aggregator_type"] = "BA"
     config["loss_type"] = "MC"
-    config["input_mlp_std_y"] = ""
+    config["input_mlp_std_y"] = "xz"
     config["self_attention_type"] = None
     config["f_act"] = "relu"
     config["n_hidden_layers"] = 2
-    config["n_hidden_units"] = 16
+    config["n_hidden_units"] = 64
     config["latent_prior_scale"] = 1.0
     config["decoder_output_scale"] = config["data_noise_std"]
 
     # training
-    config["n_tasks_train"] = int(2 ** 14)
-    config["validation_interval"] = int(2 ** 10)
+    config["n_tasks_train"] = int(2**16)
+    config["validation_interval"] = config["n_tasks_train"] // 4
     config["device"] = "cuda"
     config["adam_lr"] = 1e-4
     config["batch_size"] = config["n_task_meta"]
@@ -145,7 +170,12 @@ def main():
     # train the model
     n_task_plot = 4
     fig, axes = plt.subplots(
-        nrows=1, ncols=n_task_plot, sharex=True, sharey=True, squeeze=False
+        nrows=1,
+        ncols=n_task_plot,
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+        figsize=(5 * n_task_plot, 5),
     )
     callback = lambda np_model: plot(
         np_model=np_model,
@@ -156,9 +186,29 @@ def main():
     )
     model.meta_train(
         benchmark_meta=benchmark_meta,
+        benchmark_val=benchmark_val,
         n_tasks_train=config["n_tasks_train"],
         validation_interval=config["validation_interval"],
         callback=callback,
+    )
+
+    # test the model
+    x_test, y_test = collate_benchmark(benchmark=benchmark_test)
+    model.adapt(x=x_test, y=y_test)
+    fig, axes = plt.subplots(
+        nrows=1,
+        ncols=n_task_plot,
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+        figsize=(5 * n_task_plot, 5),
+    )
+    plot(
+        np_model=model,
+        n_task_max=n_task_plot,
+        benchmark=benchmark_test,
+        fig=fig,
+        axes=axes,
     )
     plt.show()
 

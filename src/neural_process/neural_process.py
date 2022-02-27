@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import yaml
-from metalearning_benchmarks.benchmarks.base_benchmark import (
+from metalearning_benchmarks.base_benchmark import (
     MetaLearningBenchmark,
     MetaLearningTask,
 )
@@ -282,6 +282,7 @@ class NeuralProcess:
                 "aggregator_kwargs": aggregator_kwargs,
                 "decoder_kwargs": decoder_kwargs,
                 "loss_kwargs": loss_kwargs,
+                "predictions_are_deterministic": config["loss_type"] == "PB"
             }
         )
 
@@ -606,7 +607,7 @@ class NeuralProcess:
             loss_type = "MC"
             loss_kwargs = {
                 "n_marg": 1
-                if self.predictions_are_deterministic
+                if self._config["predictions_are_deterministic"]
                 else 500,  # TODO: how many samples to use?
             }
 
@@ -1260,13 +1261,13 @@ class NeuralProcess:
             std_y = std_y.squeeze(0)
         mu_y, std_y = mu_y.numpy(), std_y.numpy()
 
-        return mu_y, std_y ** 2  # ([n_tsk,], n_pts, d_y)
+        return mu_y, std_y**2  # ([n_tsk,], n_pts, d_y)
 
     @torch.no_grad()
     def predict_importance_weights(
         self, x: np.ndarray, task_ctx: MetaLearningTask, n_marg: int
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        assert not self.predictions_are_deterministic
+        assert not self._config["predictions_are_deterministic"]
 
         # prepare x
         has_tsk_dim = x.ndim == 3
@@ -1364,21 +1365,20 @@ class NeuralProcess:
         # shapes:
         #  mu_y, std_y ** 2: ([n_tsk,], n_marg, n_pts, d_y)
         #  log_w_norm: ([n_tsk], n_marg)
-        return mu_y, std_y ** 2, log_w_norm
+        return mu_y, std_y**2, log_w_norm
 
     @torch.no_grad()
-    def adapt(self, task: MetaLearningTask) -> None:
-        context_x, context_y = task.x, task.y
-        self._check_data_shapes(x=context_x, y=context_y)
+    def adapt(self, x: np.ndarray, y: np.ndarray) -> None:
+        self._check_data_shapes(x=x, y=y)
 
         # prepare x and y
-        context_x = self._prepare_data_for_testing(context_x)
-        context_y = self._prepare_data_for_testing(context_y)
-        context_x = self._normalize_x(context_x)
-        context_y = self._normalize_y(context_y)
+        x = self._prepare_data_for_testing(x)
+        y = self._prepare_data_for_testing(y)
+        x = self._normalize_x(x)
+        y = self._normalize_y(y)
 
         # accumulate data in aggregator
-        self.aggregator.reset(n_tsk=context_x.shape[0])
-        if context_x.shape[1] > 0:
-            latent_obs = self.encoder.encode(x=context_x, y=context_y)
+        self.aggregator.reset(n_tsk=x.shape[0])
+        if x.shape[1] > 0:
+            latent_obs = self.encoder.encode(x=x, y=y)
             self.aggregator.update(latent_obs)
