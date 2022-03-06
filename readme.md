@@ -10,7 +10,7 @@ Plots taken from [3].
 
 [2] Kim et al., "Attentive Neural Processes", ICLR 2019
 
-[3] Volpp et al., "Bayesian Context Aggregation for Neural Processes", ICLR 2021
+[3] Volpp et al., "Bayesian Context Aggregation for Neural Processes", ICLR 2021, cf. https://github.com/boschresearch/bayesian-context-aggregation
 ## Getting Started
 First install ```metalearning_benchmarks``` from [here](https://github.com/michaelvolpp/metalearning_benchmarks).
 
@@ -26,5 +26,5 @@ To get familiar with the code, have a look at the example script ```./scripts/ru
 This code is still in development and thus not all features are thoroughly tested. Some features may change in the future. It was tested only with the packages listed in ```./setup.cfg```.
 
 ## License
-This code is licensed under the MIT license and is free to use by anyone without any restrictions.
+This code is licensed under the AGPL-3.0 license and is free to use by anyone without any restrictions.
 
