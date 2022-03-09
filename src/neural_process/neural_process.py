@@ -282,7 +282,7 @@ class NeuralProcess:
                 "aggregator_kwargs": aggregator_kwargs,
                 "decoder_kwargs": decoder_kwargs,
                 "loss_kwargs": loss_kwargs,
-                "predictions_are_deterministic": config["loss_type"] == "PB"
+                "predictions_are_deterministic": config["loss_type"] == "PB",
             }
         )
 
@@ -1201,15 +1201,22 @@ class NeuralProcess:
             dataloader_val = None
 
         # training loop
+        loss_meta = None
         with tqdm(
             total=n_tasks_train, leave=False, desc="meta-fit", mininterval=10
         ) as pbar:
             pbar.update(self._n_meta_tasks_seen)
             while self._n_meta_tasks_seen < n_tasks_train:
+                if callback is not None:
+                    callback(
+                        n_meta_tasks_seen=self._n_meta_tasks_seen,
+                        np_model=self,
+                        metrics={"loss_meta": loss_meta}
+                        if loss_meta is not None
+                        else None,
+                    )
                 if validate_now():
                     loss_val = validation_loss()
-                    if callback is not None:
-                        callback(np_model=self)
                 loss_meta = optimizer_step()
                 pbar.set_postfix({"loss_meta": loss_meta, "loss_val": loss_val})
 

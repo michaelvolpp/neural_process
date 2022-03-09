@@ -177,7 +177,7 @@ def main():
         squeeze=False,
         figsize=(5 * n_task_plot, 5),
     )
-    callback = lambda np_model: plot(
+    callback = lambda n_meta_tasks_seen, np_model, metrics: plot(
         np_model=np_model,
         n_task_max=n_task_plot,
         benchmark=benchmark_meta,
