@@ -1248,7 +1248,13 @@ class NeuralProcess:
 
         # denormalize the predictions
         mu_y = self._denormalize_mu_y(mu_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
-        std_y = self._denormalize_std_y(std_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
+        if (
+            self._config["decoder_kwargs"]["input_mlp_std_y"] == ""
+            and self._config["decoder_kwargs"]["global_std_y_is_learnable"]
+        ):
+            raise NotImplementedError  # think about denormalization
+        if not self._config["decoder_kwargs"]["input_mlp_std_y"] == "":
+            std_y = self._denormalize_std_y(std_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
 
         # check that target and context data are consistent
         if has_tsk_dim and mu_y.shape[0] != x.shape[0]:
@@ -1268,7 +1274,7 @@ class NeuralProcess:
             std_y = std_y.squeeze(0)
         mu_y, std_y = mu_y.numpy(), std_y.numpy()
 
-        return mu_y, std_y**2  # ([n_tsk,], n_pts, d_y)
+        return mu_y, std_y ** 2  # ([n_tsk,], n_pts, d_y)
 
     @torch.no_grad()
     def predict_importance_weights(
@@ -1372,7 +1378,7 @@ class NeuralProcess:
         # shapes:
         #  mu_y, std_y ** 2: ([n_tsk,], n_marg, n_pts, d_y)
         #  log_w_norm: ([n_tsk], n_marg)
-        return mu_y, std_y**2, log_w_norm
+        return mu_y, std_y ** 2, log_w_norm
 
     @torch.no_grad()
     def adapt(self, x: np.ndarray, y: np.ndarray) -> None:
