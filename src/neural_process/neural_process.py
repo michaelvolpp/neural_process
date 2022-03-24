@@ -1179,7 +1179,8 @@ class NeuralProcess:
         )
 
         # determine normalizers on metadata before starting training
-        if self._n_meta_tasks_seen == 0:
+        # (normalizers could be already available if this fct was called with 0 iters)
+        if self._n_meta_tasks_seen == 0 and not self._normalizers_available:
             self._determine_normalizers(benchmark=benchmark_meta)
 
         # set device for training
@@ -1201,7 +1202,7 @@ class NeuralProcess:
             dataloader_val = None
 
         # training loop
-        loss_meta = None
+        loss_meta, loss_val = None, None
         with tqdm(
             total=n_tasks_train, leave=False, desc="meta-fit", mininterval=10
         ) as pbar:
@@ -1229,7 +1230,7 @@ class NeuralProcess:
         return loss_val
 
     @torch.no_grad()
-    def predict(self, x: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def predict(self, x: np.ndarray, n_samples: int = 1) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         # check input data
         self._check_data_shapes(x=x)
 
@@ -1244,7 +1245,7 @@ class NeuralProcess:
         cov_z = ls[1][:, None, :] if ls[1] is not None else None
 
         # obtain predictions
-        mu_y, std_y = self._predict(x, mu_z, cov_z, n_marg=1)
+        mu_y, std_y = self._predict(x, mu_z, cov_z, n_marg=n_samples)
 
         # denormalize the predictions
         mu_y = self._denormalize_mu_y(mu_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
@@ -1266,7 +1267,8 @@ class NeuralProcess:
         mu_y, std_y = mu_y.squeeze(1), std_y.squeeze(1)  # squeeze n_ls dimension
 
         # squeeze marginalization dimension (this is always singleton here)
-        mu_y, std_y = mu_y.squeeze(1), std_y.squeeze(1)  # squeeze n_marg dimension
+        if n_samples == 1:
+            mu_y, std_y = mu_y.squeeze(1), std_y.squeeze(1)  # squeeze n_marg dimension
 
         # squeeze task dimension (if singleton)
         if not has_tsk_dim:
@@ -1274,7 +1276,7 @@ class NeuralProcess:
             std_y = std_y.squeeze(0)
         mu_y, std_y = mu_y.numpy(), std_y.numpy()
 
-        return mu_y, std_y ** 2  # ([n_tsk,], n_pts, d_y)
+        return mu_y, std_y ** 2  # ([n_tsk,], [n_samples], n_pts, d_y)
 
     @torch.no_grad()
     def predict_importance_weights(
