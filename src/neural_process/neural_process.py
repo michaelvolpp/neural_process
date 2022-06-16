@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import yaml
-from metalearning_benchmarks.base_benchmark import (
+from metalearning_benchmarks import (
     MetaLearningBenchmark,
     MetaLearningTask,
 )
