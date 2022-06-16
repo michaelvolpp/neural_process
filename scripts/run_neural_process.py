@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 from matplotlib import pyplot as plt
-from metalearning_benchmarks.base_benchmark import MetaLearningBenchmark
+from metalearning_benchmarks import MetaLearningBenchmark
 from metalearning_benchmarks import benchmark_dict as BM_DICT
 from neural_process.neural_process import NeuralProcess
 from pprint import pprint
