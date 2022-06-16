@@ -792,7 +792,7 @@ class NeuralProcess:
             latent_obs_all = None  # not necessary
         else:  # loss_type == "VI"
             # sample a test set from the remaining points
-            n_tst = self._rng.randint(low=1, high=n_all - n_ctx, size=(1,)).squeeze()
+            n_tst = self._rng.randint(low=1, high=n_all - n_ctx + 1, size=(1,)).squeeze()
             x_tgt = x_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
             y_tgt = y_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
             latent_obs_all = self.encoder.encode(x_all, y_all)
@@ -1106,11 +1106,14 @@ class NeuralProcess:
         self,
         benchmark_meta: MetaLearningBenchmark,
         n_tasks_train: int,
-        validation_interval: int,
+        validation_interval: Optional[int] = None,
         benchmark_val: Optional[MetaLearningBenchmark] = None,
         callback=None,
     ) -> float:
         def validate_now() -> bool:
+            if validation_interval is None:
+                return False
+
             # at beginning
             if self._n_meta_tasks_seen == 0:
                 return True
