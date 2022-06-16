@@ -792,7 +792,9 @@ class NeuralProcess:
             latent_obs_all = None  # not necessary
         else:  # loss_type == "VI"
             # sample a test set from the remaining points
-            n_tst = self._rng.randint(low=1, high=n_all - n_ctx + 1, size=(1,)).squeeze()
+            n_tst = self._rng.randint(
+                low=1, high=n_all - n_ctx + 1, size=(1,)
+            ).squeeze()
             x_tgt = x_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
             y_tgt = y_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
             latent_obs_all = self.encoder.encode(x_all, y_all)
@@ -1207,7 +1209,7 @@ class NeuralProcess:
         # training loop
         loss_meta, loss_val = None, None
         with tqdm(
-            total=n_tasks_train, leave=False, desc="meta-fit", mininterval=10
+            total=n_tasks_train, leave=False, desc="meta-fit", mininterval=1
         ) as pbar:
             pbar.update(self._n_meta_tasks_seen)
             while self._n_meta_tasks_seen < n_tasks_train:
@@ -1222,7 +1224,9 @@ class NeuralProcess:
                 if validate_now():
                     loss_val = validation_loss()
                 loss_meta = optimizer_step()
-                pbar.set_postfix({"loss_meta": loss_meta, "loss_val": loss_val})
+                pbar.set_postfix(
+                    {"loss_meta": loss_meta, "loss_val": loss_val}, refresh=False
+                )
 
             # compute loss_val once again at the end
             loss_val = validation_loss()
@@ -1233,7 +1237,9 @@ class NeuralProcess:
         return loss_val
 
     @torch.no_grad()
-    def predict(self, x: np.ndarray, n_samples: int = 1) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def predict(
+        self, x: np.ndarray, n_samples: int = 1
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         # check input data
         self._check_data_shapes(x=x)
 
@@ -1279,7 +1285,7 @@ class NeuralProcess:
             std_y = std_y.squeeze(0)
         mu_y, std_y = mu_y.numpy(), std_y.numpy()
 
-        return mu_y, std_y ** 2  # ([n_tsk,], [n_samples], n_pts, d_y)
+        return mu_y, std_y**2  # ([n_tsk,], [n_samples], n_pts, d_y)
 
     @torch.no_grad()
     def predict_importance_weights(
@@ -1383,7 +1389,7 @@ class NeuralProcess:
         # shapes:
         #  mu_y, std_y ** 2: ([n_tsk,], n_marg, n_pts, d_y)
         #  log_w_norm: ([n_tsk], n_marg)
-        return mu_y, std_y ** 2, log_w_norm
+        return mu_y, std_y**2, log_w_norm
 
     @torch.no_grad()
     def adapt(self, x: np.ndarray, y: np.ndarray) -> None:
