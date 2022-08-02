@@ -1174,7 +1174,7 @@ class NeuralProcess:
             self._n_meta_tasks_seen += n_tasks_in_batch
             pbar.update(n_tasks_in_batch)
 
-            return loss_meta.detach().numpy()
+            return loss_meta.detach().cpu().numpy()
 
         # log
         self._logger.info(
@@ -1283,7 +1283,7 @@ class NeuralProcess:
         if not has_tsk_dim:
             mu_y = mu_y.squeeze(0)
             std_y = std_y.squeeze(0)
-        mu_y, std_y = mu_y.numpy(), std_y.numpy()
+        mu_y, std_y = mu_y.cpu().numpy(), std_y.cpu().numpy()
 
         return mu_y, std_y**2  # ([n_tsk,], [n_samples], n_pts, d_y)
 
