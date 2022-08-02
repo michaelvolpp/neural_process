@@ -112,7 +112,7 @@ class NeuralProcess:
         # initialize architecture
         self._modules = []
         self._create_architecture()
-        self._set_device("cpu")
+        self._set_device(device)
 
         # initialize optimizer
         self._optimizer = None
@@ -463,7 +463,7 @@ class NeuralProcess:
         with open(os.path.join(self._logpath, self._f_normalizers), "r") as f:
             self._normalizers = yaml.safe_load(f)
         for (key, val) in self._normalizers.items():
-            self._normalizers[key] = torch.tensor(val)
+            self._normalizers[key] = torch.tensor(val, device=self.device)
 
     def _determine_normalizers(self, benchmark, n_tasks=1000):
         # check that we've not already determined normalizers
@@ -483,10 +483,10 @@ class NeuralProcess:
         x, y = next(iter(dataloader))
 
         # compute normalizers across (n_task, n_datapoints_per_task) dimensions
-        self._normalizers["x_mu"] = x.double().mean(dim=(0, 1)).float()
-        self._normalizers["y_mu"] = y.double().mean(dim=(0, 1)).float()
-        self._normalizers["x_std"] = x.double().std(dim=(0, 1)).float()
-        self._normalizers["y_std"] = y.double().std(dim=(0, 1)).float()
+        self._normalizers["x_mu"] = x.double().mean(dim=(0, 1)).float().to(self.device)
+        self._normalizers["y_mu"] = y.double().mean(dim=(0, 1)).float().to(self.device)
+        self._normalizers["x_std"] = x.double().std(dim=(0, 1)).float().to(self.device)
+        self._normalizers["y_std"] = y.double().std(dim=(0, 1)).float().to(self.device)
 
         self._write_normalizers_to_file()
 
@@ -749,7 +749,7 @@ class NeuralProcess:
         self._create_architecture()
         self._load_weights_from_file()
         self._load_normalizers_from_file()
-        self._set_device(self._config["device"])
+        self._set_device(self.device)
 
         # initialize random number generator
         self._rng = np.random.RandomState()
@@ -769,7 +769,7 @@ class NeuralProcess:
                 raise NotImplementedError("y has wrong shape!")
 
     def _prepare_data_for_testing(self, data):
-        data = torch.Tensor(data)
+        data = torch.tensor(data, device=self.device).float()
         assert 2 <= data.ndim <= 3
         if data.ndim == 2:
             data = data[None, :, :]  # add task dimension
@@ -1189,7 +1189,7 @@ class NeuralProcess:
             self._determine_normalizers(benchmark=benchmark_meta)
 
         # set device for training
-        self._set_device(self._config["device"])
+        self._set_device(self.device)
 
         # create dataloader
         dataloader_meta = DataLoader(
@@ -1231,7 +1231,7 @@ class NeuralProcess:
             # compute loss_val once again at the end
             loss_val = validation_loss()
 
-        self._set_device("cpu")
+        self._set_device(self.device)
         self._logger.info("Training finished successfully!")
 
         return loss_val
