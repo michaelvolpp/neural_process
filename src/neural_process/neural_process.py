@@ -749,7 +749,7 @@ class NeuralProcess:
         self._create_architecture()
         self._load_weights_from_file()
         self._load_normalizers_from_file()
-        self._set_device("cpu")
+        self._set_device(self._config["device"])
 
         # initialize random number generator
         self._rng = np.random.RandomState()
