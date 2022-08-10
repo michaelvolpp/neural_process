@@ -1054,6 +1054,28 @@ class NeuralProcess:
 
         return elbo
 
+
+    def _sample_z(self, mu_z, cov_z, n_samples):
+        # read out sizes
+        n_tsk = mu_z.shape[0]
+        n_ls = mu_z.shape[1]
+
+        # expand mu_z, std_z w.r.t. n_marg
+        mu_z = mu_z[:, :, None, :]
+        mu_z = mu_z.expand(n_tsk, n_ls, n_samples, self.settings["d_z"])
+        std_z = torch.sqrt(cov_z)
+        std_z = std_z[:, :, None, :]
+        std_z = std_z.expand(n_tsk, n_ls, n_samples, self.settings["d_z"])
+
+        # sample z
+        eps = self._rng.randn(*mu_z.shape)
+        eps = torch.tensor(eps, dtype=torch.float32).to(self.device)
+        z = mu_z + eps * std_z
+
+        # check output
+        assert z.shape == (n_tsk, n_ls, n_samples, self.settings["d_z"])
+        return z
+
     def _predict(self, x, mu_z, cov_z, n_marg, return_latent_samples=False):
         assert x.ndim == 3  # (n_tsk, n_tst, d_x)
         assert mu_z.ndim == 3  # (n_tsk, n_ls, d_z)
@@ -1078,18 +1100,7 @@ class NeuralProcess:
                 mu_z = mu_z.expand(n_tsk, n_ls, n_marg, d_z)
                 mu_y, std_y = self.decoder.decode(x, mu_z)
         else:  # MC, IWMC, or VI losses:
-            std_z = torch.sqrt(cov_z)
-
-            # expand mu_z, std_z w.r.t. n_marg
-            mu_z = mu_z[:, :, None, :]
-            mu_z = mu_z.expand(n_tsk, n_ls, n_marg, d_z)
-            std_z = std_z[:, :, None, :]
-            std_z = std_z.expand(n_tsk, n_ls, n_marg, d_z)
-
-            eps = self._rng.randn(*mu_z.shape)
-            eps = torch.tensor(eps, dtype=torch.float32).to(self.device)
-            z = mu_z + eps * std_z
-
+            z = self._sample_z(mu_z=mu_z, cov_z=cov_z, n_samples=n_marg)
             mu_y, std_y = self.decoder.decode(
                 x=x, z=z, mu_z=mu_z, cov_z=cov_z
             )  # (n_tsk, n_ls, n_marg, n_tst, d_y)
@@ -1283,8 +1294,8 @@ class NeuralProcess:
         if not has_tsk_dim:
             mu_y = mu_y.squeeze(0)
             std_y = std_y.squeeze(0)
-        mu_y, std_y = mu_y.numpy(), std_y.numpy()
 
+        mu_y, std_y = mu_y.numpy(), std_y.numpy()
         return mu_y, std_y**2  # ([n_tsk,], [n_samples], n_pts, d_y)
 
     @torch.no_grad()
@@ -1406,3 +1417,72 @@ class NeuralProcess:
         if x.shape[1] > 0:
             latent_obs = self.encoder.encode(x=x, y=y)
             self.aggregator.update(latent_obs)
+
+    @torch.no_grad()
+    def sample_z(self, n_samples):
+        # check input
+        assert self.settings["loss_type"] != "PB"
+
+        # read out last latent state
+        ls = self.aggregator.last_latent_state
+        mu_z = ls[0][:, None, :]
+        cov_z = ls[1][:, None, :] if ls[1] is not None else None
+
+        # read out sizes
+        n_tsk = mu_z.shape[0]
+        n_ls = mu_z.shape[1]
+        assert n_ls == 1
+
+        # sample z
+        z = self._sample_z(mu_z = mu_z, cov_z=cov_z, n_samples=n_samples)
+
+        # squeeze n_ls dimension
+        z = z.squeeze(1)
+
+        # check output
+        z = z.numpy()
+        assert z.shape == (n_tsk, n_samples, self.settings["d_z"])
+        return z
+
+    @torch.no_grad()    
+    def predict_at_z(self, x, z):
+        # check input
+        assert self.settings["loss_type"] != "PB"
+        n_tsk = x.shape[0]
+        n_pts = x.shape[1]
+        n_samples = z.shape[1]
+        assert x.shape == (n_tsk, n_pts, self.settings["d_x"])
+        assert z.shape == (n_tsk, n_samples, self.settings["d_z"])
+
+        # check input data
+        self._check_data_shapes(x=x)
+
+        # prepare x and z
+        x = self._prepare_data_for_testing(x)
+        x = self._normalize_x(x)
+        z = torch.Tensor(z, device=self.device)
+        z = z[:, None, :, :]  # add dummy ls dimension
+
+        # predict
+        mu_y, std_y = self.decoder.decode(x=x, z=z)
+        assert mu_y.shape == (n_tsk, 1, n_samples, n_pts, self.settings["d_y"])
+        assert std_y.shape == (n_tsk, 1, n_samples, n_pts, self.settings["d_y"])
+
+        # denormalize the predictions
+        mu_y = self._denormalize_mu_y(mu_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
+        if (
+            self._config["decoder_kwargs"]["input_mlp_std_y"] == ""
+            and self._config["decoder_kwargs"]["global_std_y_is_learnable"]
+        ):
+            raise NotImplementedError  # think about denormalization
+        if not self._config["decoder_kwargs"]["input_mlp_std_y"] == "":
+            std_y = self._denormalize_std_y(std_y)  # (n_tsk, n_ls, n_marg, n_tst, d_y)
+
+        # squeeze latent state dimension (this is always singleton here)
+        mu_y, std_y = mu_y.squeeze(1), std_y.squeeze(1)  # squeeze n_ls dimension
+
+        # check output
+        mu_y, std_y = mu_y.numpy(), std_y.numpy()
+        assert mu_y.shape == (n_tsk, n_samples, n_pts, self.settings["d_y"])
+        assert std_y.shape == (n_tsk, n_samples, n_pts, self.settings["d_y"])
+        return mu_y, std_y**2
