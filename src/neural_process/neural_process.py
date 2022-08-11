@@ -785,18 +785,20 @@ class NeuralProcess:
         x_ctx = x_all[:, idx_pts[:n_ctx], :]
         y_ctx = y_all[:, idx_pts[:n_ctx], :]
 
+        # determine target points
         if not (loss_type == "MCIW" or loss_type == "IWMCIW" or loss_type == "VI"):
-            # use remaining points as test points
-            x_tgt = x_all[:, idx_pts[n_ctx:], :]
-            y_tgt = y_all[:, idx_pts[n_ctx:], :]
+            # use all points as test points
+            x_tgt = x_all[:, idx_pts, :]
+            y_tgt = y_all[:, idx_pts, :]
             latent_obs_all = None  # not necessary
         else:  # loss_type == "VI"
-            # sample a test set from the remaining points
-            n_tst = self._rng.randint(
-                low=1, high=n_all - n_ctx + 1, size=(1,)
-            ).squeeze()
-            x_tgt = x_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
-            y_tgt = y_all[:, idx_pts[n_ctx : n_ctx + n_tst], :]
+            # sample a test set size between [n_ctx + 1, n_all]
+            assert n_ctx < n_all, "Context set must not comprise all data!"
+            low = n_ctx + 1
+            high = n_all + 1 # exclusive
+            n_tst = self._rng.randint(low=low, high=high, size=(1,)).squeeze()
+            x_tgt = x_all[:, idx_pts[: n_tst], :]
+            y_tgt = y_all[:, idx_pts[: n_tst], :]
             latent_obs_all = self.encoder.encode(x_all, y_all)
 
         return x_ctx, y_ctx, x_tgt, y_tgt, latent_obs_all
