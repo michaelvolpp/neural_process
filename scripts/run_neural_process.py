@@ -1,11 +1,11 @@
 import os
+from pprint import pprint
 
 import numpy as np
 from matplotlib import pyplot as plt
 from metalearning_benchmarks import MetaLearningBenchmark
 from metalearning_benchmarks import benchmark_dict as BM_DICT
 from neural_process.neural_process import NeuralProcess
-from pprint import pprint
 
 
 def collate_benchmark(benchmark: MetaLearningBenchmark):
@@ -73,19 +73,19 @@ def main():
     config["seed"] = 1234
     # meta data
     config["data_noise_std"] = 0.1
-    config["n_task_meta"] = 64 
+    config["n_task_meta"] = 64
     config["n_datapoints_per_task_meta"] = 64
     config["seed_task_meta"] = 1234
     config["seed_x_meta"] = 2234
     config["seed_noise_meta"] = 3234
     # validation data
-    config["n_task_val"] = 64 
+    config["n_task_val"] = 64
     config["n_datapoints_per_task_val"] = 64
     config["seed_task_val"] = 1236
     config["seed_x_val"] = 2236
     config["seed_noise_val"] = 3236
     # test data
-    config["n_task_test"] = 64 
+    config["n_task_test"] = 64
     config["n_datapoints_per_task_test"] = 16
     config["seed_task_test"] = 1235
     config["seed_x_test"] = 2235
@@ -132,7 +132,7 @@ def main():
     config["decoder_output_scale"] = config["data_noise_std"]
 
     # training
-    config["n_tasks_train"] = int(2**16)
+    config["n_tasks_train"] = int(2**8) # increase this for proper performance
     config["validation_interval"] = config["n_tasks_train"] // 4
     config["device"] = "cuda"
     config["adam_lr"] = 1e-4
@@ -177,13 +177,15 @@ def main():
         squeeze=False,
         figsize=(5 * n_task_plot, 5),
     )
-    callback = lambda n_meta_tasks_seen, np_model, metrics: plot(
-        np_model=np_model,
-        n_task_max=n_task_plot,
-        benchmark=benchmark_meta,
-        fig=fig,
-        axes=axes,
-    )
+    # to enable online plotting uncomment the following
+    # callback = lambda n_meta_tasks_seen, np_model, metrics: plot(
+    #     np_model=np_model,
+    #     n_task_max=n_task_plot,
+    #     benchmark=benchmark_meta,
+    #     fig=fig,
+    #     axes=axes,
+    # )
+    callback = None
     model.meta_train(
         benchmark_meta=benchmark_meta,
         benchmark_val=benchmark_val,
