@@ -233,7 +233,7 @@ class DecoderNetworkSamples:
 
             # apply inverse output transform
             assert (
-                global_std_y_init >= self.std_y_lower_bound
+                torch.all(global_std_y_init >= self.std_y_lower_bound)
             ), "Global std y has to be initialized in accordance to std y lower bound!"
             self._global_std_y = inv_output_trafo(
                 global_std_y_init, lower_bound=self.std_y_lower_bound
