@@ -139,8 +139,8 @@ def main():
     config["batch_size"] = config["n_task_meta"]
     config["n_samples"] = 16
     config["n_context"] = (
-        config["n_datapoints_per_task_test"],
-        config["n_datapoints_per_task_test"],
+        1,
+        config["n_datapoints_per_task_meta"] - 1,
     )
 
     # generate NP model
