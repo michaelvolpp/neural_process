@@ -161,6 +161,24 @@ class NeuralProcess:
         return ms in NeuralProcess.get_valid_model_specs()
 
     @staticmethod
+    def _get_parameters(modules):
+        """
+        Returns an iterable of parameters that are trainable in modules.
+        """
+        parameters = []
+        for module in modules:
+            if isinstance(module.parameters, list):
+                parameters += module.parameters
+            else:
+                assert isinstance(module.parameters(), types.GeneratorType)
+                parameters += list(module.parameters())
+        return parameters
+
+    @staticmethod
+    def _count_trainable_parameters(parameters):
+        return sum(p.numel() for p in parameters if p.requires_grad)
+
+    @staticmethod
     def _build_config(
         logpath: int,
         seed: int,
@@ -304,14 +322,26 @@ class NeuralProcess:
         """
         Returns an iterable of parameters that are trainable in the model.
         """
-        parameters = []
-        for module in self._modules:
-            if isinstance(module.parameters, list):
-                parameters += module.parameters
-            else:
-                assert isinstance(module.parameters(), types.GeneratorType)
-                parameters += list(module.parameters())
-        return parameters
+        return self._get_parameters(self._modules)
+
+    @property
+    def n_trainable_params(self) -> int:
+        parameters = self.parameters
+        return self._count_trainable_parameters(parameters)
+
+    @property
+    def n_trainable_params_decoder(self) -> int:
+        parameters = self._get_parameters([self.decoder])
+        return self._count_trainable_parameters(parameters)
+
+    @property
+    def n_trainable_params_encoder(self) -> int:
+        parameters = self._get_parameters([self.encoder, self.aggregator])
+        return self._count_trainable_parameters(parameters)
+
+    @property
+    def n_trainable_params_encoder_per_task(self) -> int:
+        return self.n_trainable_params_encoder
 
     def _configure_logger(self):
         """
